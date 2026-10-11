@@ -1,0 +1,4 @@
+langgraph==1.2.14
+langchain-openai==1.7.0
+langchain-core==1.6.9
+openai==3.26.1
