@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""bugfix-bot: a small LangGraph agent that fixes a reported bug and pushes a branch.
+"""bugfix-bot: a small LangGraph agent that fixes a reported bug and commits the fix.
 
-It is meant to run inside an NVIDIA OpenShell sandbox. There, GITHUB_TOKEN and
-OPENAI_API_KEY hold placeholders, not keys. 1Password hands the real values to
-the OpenShell gateway for a limited time, and the gateway swaps them in only for
-requests to github.com (from git) and api.openai.com (from Python).
+It is meant to run inside an NVIDIA OpenShell sandbox, started by run_task.sh. There,
+GITHUB_TOKEN and OPENAI_API_KEY hold placeholders, not keys. 1Password hands the real
+values to the OpenShell gateway, and the gateway swaps them in only for requests that
+the current rules allow. The agent has no push access: run_task.sh checks the commit
+and pushes it.
 """
 
 import argparse
 import os
+import shutil
 import subprocess
+import time
 from pathlib import Path
 
 from langchain_core.tools import tool
@@ -17,11 +20,12 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
-REPO_DIR = Path.cwd() / "repo"
+REPO_DIR = Path.home() / "repo"
 
 SYSTEM_PROMPT = """You are bugfix-bot, a coding agent working in a git repository.
 Read BUG_REPORT.md, fix the bug in the code, and run `python3 -m unittest -v` until the tests pass.
-Then create the branch {branch}, commit your change with a clear message, and run `git push origin {branch}`.
+Then create the branch {branch} and commit your change with a clear message.
+Do not push: you have no push access, and a runner outside the sandbox checks your commit and pushes it.
 Finish with a two-sentence summary of what you changed."""
 
 
@@ -76,7 +80,15 @@ def describe(name: str) -> str:
 def clone(repo: str) -> None:
     token = os.environ["GITHUB_TOKEN"]  # a placeholder inside the sandbox
     url = f"https://x-access-token:{token}@github.com/{repo}.git"
-    subprocess.run(["git", "clone", "--quiet", url, str(REPO_DIR)], check=True)
+    # OpenShell reloads the sandbox's rules a few seconds after it starts, which can cut
+    # a connection that is open at that moment, so try the clone a few times.
+    for _ in range(3):
+        if subprocess.run(["git", "clone", "--quiet", url, str(REPO_DIR)]).returncode == 0:
+            break
+        shutil.rmtree(REPO_DIR, ignore_errors=True)
+        time.sleep(5)
+    else:
+        raise SystemExit(f"could not clone {repo}")
     for key, value in (("user.name", "bugfix-bot"), ("user.email", "bugfix-bot@example.com")):
         subprocess.run(["git", "config", key, value], cwd=REPO_DIR, check=True)
 
@@ -106,7 +118,9 @@ def main() -> None:
                     print(f"[agent] {call['name']}({str(call['args'])[:300]})")
                 text = message.content if isinstance(message.content, str) else str(message.content)
                 if node == "tools":
-                    print(f"[tool]  {text[:400]}")
+                    lines = [line for line in text.splitlines() if line.strip()] or [""]
+                    shown = lines[0] if len(lines) == 1 else f"{lines[0]} … {lines[-1]}"
+                    print(f"[tool]  {shown[:160]}")
                 elif text:
                     print(f"[agent] {text}")
 
