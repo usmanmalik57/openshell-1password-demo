@@ -43,7 +43,7 @@ Run the commands from the repo root.
    - Go to **Developer → View Environments → New environment**, name it `bugfix-bot`, and add two variables: `GITHUB_TOKEN` and `OPENAI_API_KEY`.
    - In the Environment, under **Connect to**, select **Connect** next to **OpenShell provider**. Choose **Existing profile → GitHub** and the provider name `op-bugfix-bot`.
    - Connect a second time, with **Existing profile → OpenAI** and the provider name `op-bugfix-bot-openai`.
-   - For each connection, pick an expiry and approve with your account password.
+   - For each connection, pick a short expiry under **Secrets expire** (for example **Custom… → 5 minutes**) and approve with your account password.
 
    `openshell provider list` should now show both providers. If you chose other names, set them with `GITHUB_PROVIDER=… OPENAI_PROVIDER=…` in front of the command in the next step.
 
@@ -62,7 +62,7 @@ Run the commands from the repo root.
 
    Your repo then has the new branch with the fix.
 
-Because the runner removes the keys at the end, every run needs a new approval: connect the Environment again in 1Password (step 3), and pick a new branch name.
+Because the runner removes the keys at the end, every run needs a new approval. In 1Password, open the `bugfix-bot` Environment, click **⋮ → Send again** on both OpenShell connections, and approve. Pick a new branch name too.
 
 ## Good to know
 

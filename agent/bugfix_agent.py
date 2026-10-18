@@ -41,13 +41,19 @@ def run_shell(command: str) -> str:
 @tool
 def read_file(path: str) -> str:
     """Return the contents of a text file in the repository."""
-    return (REPO_DIR / path).read_text()
+    try:
+        return (REPO_DIR / path).read_text()
+    except OSError as error:  # a wrong path goes back to the model instead of ending the run
+        return f"error: {error}"
 
 
 @tool
 def write_file(path: str, content: str) -> str:
     """Replace the contents of a file in the repository."""
-    (REPO_DIR / path).write_text(content)
+    try:
+        (REPO_DIR / path).write_text(content)
+    except OSError as error:
+        return f"error: {error}"
     return f"wrote {len(content)} characters to {path}"
 
 
